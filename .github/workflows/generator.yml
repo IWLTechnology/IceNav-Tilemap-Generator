@@ -1,0 +1,105 @@
+#Uncomment the lines below to enable water polygons
+name: Generator
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  push:
+    branches:
+      - main
+    paths:
+      - 'maps-list.txt'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  generator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Load map list
+        run: |
+          MAP_LIST=$(grep -v '^#' "$GITHUB_WORKSPACE/maps-list.txt" | grep -v '^$' | xargs)
+          echo "Processing maps: $MAP_LIST"
+          echo "MAPS<<EOF" >> $GITHUB_ENV
+          echo "$MAP_LIST" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake libosmium2-dev libgeos-dev libgdal-dev libbz2-dev zlib1g-dev libexpat1-dev nlohmann-json3-dev
+
+      - name: Clone Tile-Generator repository
+        run: |
+          git clone https://github.com/jgauchia/Tile-Generator.git
+
+      - name: Build Tile-Generator
+        run: |
+          cd Tile-Generator
+          mkdir build
+          cd build
+          cmake ..
+          make -j$(nproc)
+      #- name: Download water polygons
+        #run: |
+         # mkdir water
+         # cd water
+         # curl -LO "https://osmdata.openstreetmap.de/download/water-polygons-split-4326.zip"
+         # unzip water-polygons-split-4326.zip
+         # rm water-polygons-split-4326.zip
+         # SHP_PATH=$(find . -name "water_polygons.shp" -print -quit)
+         # echo "WATER_SHP=$PWD/$SHP_PATH" >> $GITHUB_ENV
+
+      - name: Process maps
+        run: |
+          mkdir pbfs
+          mkdir tiles
+          for map in ${{ env.MAPS }}; do
+            echo "Processing map: $map"
+            curl -LO "https://download.geofabrik.de/${map}-latest.osm.pbf"
+            nm=$(basename "$map")
+            mv "${nm}-latest.osm.pbf" pbfs/
+            mkdir "tiles/${nm}"
+            ./Tile-Generator/build/nav_generator \
+              "pbfs/${nm}-latest.osm.pbf" \
+              "tiles/${nm}" \
+              Tile-Generator/features.json \
+              --zoom 1-17 \
+             # --water-shp "${{ env.WATER_SHP }}"
+            cd tiles
+            zip -q -r "../map-${nm}.zip" "${nm}"
+            cd ..
+            rm -f "pbfs/${nm}-latest.osm.pbf"
+            rm -rf "tiles/${nm}"
+          done
+         # rm -rf water/
+
+      - name: Generate release text
+        id: release_notes
+        run: |
+          TOTAL_ZIP_COUNT=$(ls -1 map-*.zip | wc -l)
+          REGIONS_LIST="${{ env.MAPS }}"
+          REGIONS_LIST="${REGIONS_LIST// /, }"
+          REGIONS_LIST="${REGIONS_LIST%,}"
+          DISK_USAGE=$(du -sh tiles/ | cut -f1)
+          echo "BODY_TEXT<<EOF" >> $GITHUB_OUTPUT
+          echo "A build of IceNav vector map tiles from zoom level 1-17." >> $GITHUB_OUTPUT
+          echo "Download the regions that you wish, unzip them and then use them with IceNav." >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### Build Statistics:" >> $GITHUB_OUTPUT
+          echo "- **Included Regions ($TOTAL_ZIP_COUNT total):** $REGIONS_LIST" >> $GITHUB_OUTPUT
+          echo "- **Total Uncompressed File Size:** $DISK_USAGE" >> $GITHUB_OUTPUT
+          echo "- **Build Timestamp:** $(date -u)" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload as new GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "tiles-${{ github.run_number }}"
+          name: "Generated IceNav Vector Tiles (Run #${{ github.run_number }})"
+          body: ${{ steps.release_notes.outputs.BODY_TEXT }}
+          draft: false
+          prerelease: false
+          files: |
+            map-*.zip
