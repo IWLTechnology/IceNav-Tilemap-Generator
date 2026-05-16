@@ -65,7 +65,7 @@ jobs:
               "pbfs/${nm}-latest.osm.pbf" \
               "tiles/${nm}" \
               Tile-Generator/features.json \
-              --zoom 1-17 \
+              --zoom 1-16 \
              # --water-shp "${{ env.WATER_SHP }}"
             cd tiles
             zip -q -r "../map-${nm}.zip" "${nm}"
@@ -84,7 +84,7 @@ jobs:
           REGIONS_LIST="${REGIONS_LIST%,}"
           DISK_USAGE=$(du -sh tiles/ | cut -f1)
           echo "BODY_TEXT<<EOF" >> $GITHUB_OUTPUT
-          echo "A build of IceNav vector map tiles from zoom level 1-17." >> $GITHUB_OUTPUT
+          echo "A build of IceNav vector map tiles from zoom level 1-16." >> $GITHUB_OUTPUT
           echo "Download the regions that you wish, unzip them and then use them with IceNav." >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           echo "### Build Statistics:" >> $GITHUB_OUTPUT
