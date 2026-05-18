@@ -82,14 +82,12 @@ jobs:
           REGIONS_LIST="${{ env.MAPS }}"
           REGIONS_LIST="${REGIONS_LIST// /, }"
           REGIONS_LIST="${REGIONS_LIST%,}"
-          DISK_USAGE=$(du -sh tiles/ | cut -f1)
           echo "BODY_TEXT<<EOF" >> $GITHUB_OUTPUT
           echo "A build of IceNav vector map tiles from zoom level 1-16." >> $GITHUB_OUTPUT
           echo "Download the regions that you wish, unzip them and then use them with IceNav." >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           echo "### Build Statistics:" >> $GITHUB_OUTPUT
           echo "- **Included Regions ($TOTAL_ZIP_COUNT total):** $REGIONS_LIST" >> $GITHUB_OUTPUT
-          echo "- **Total Uncompressed File Size:** $DISK_USAGE" >> $GITHUB_OUTPUT
           echo "- **Build Timestamp:** $(date -u)" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
