@@ -1,1 +1,4 @@
-australia-oceania/australia
+australia-oceania/australia/act
+australia-oceania/australia/new-south-wales
+australia-oceania/australia/south-australia
+australia-oceania/australia/western-australia
